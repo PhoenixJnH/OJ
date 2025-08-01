@@ -1,16 +1,18 @@
 package com.jh.ojcodesandbox.docker;
 
 import com.github.dockerjava.api.DockerClient;
-import com.github.dockerjava.api.command.*;
+import com.github.dockerjava.api.command.CreateContainerCmd;
+import com.github.dockerjava.api.command.CreateContainerResponse;
+import com.github.dockerjava.api.command.ListContainersCmd;
 import com.github.dockerjava.api.model.Container;
-import com.github.dockerjava.api.model.PullResponseItem;
 import com.github.dockerjava.core.DockerClientBuilder;
 
-import java.util.ArrayList;
 import java.util.List;
 
-public class DockerDemo {
-    public static void main(String[] args) throws InterruptedException {
+public class DockerDemo
+{
+    public static void main(String[] args) throws InterruptedException
+    {
         DockerClient dockerClient = DockerClientBuilder.getInstance().build();
         String image = "nginx:latest";
 //        PullImageCmd pullImageCmd = dockerClient.pullImageCmd(image);
@@ -39,7 +41,8 @@ public class DockerDemo {
         // 查看容器状态
         ListContainersCmd listContainersCmd = dockerClient.listContainersCmd();
         List<Container> containerList = listContainersCmd.withShowAll(true).exec();
-        for (Container container : containerList) {
+        for (Container container : containerList)
+        {
             System.out.println(container);
         }
     }
