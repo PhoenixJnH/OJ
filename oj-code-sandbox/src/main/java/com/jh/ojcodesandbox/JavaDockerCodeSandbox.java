@@ -2,6 +2,7 @@ package com.jh.ojcodesandbox;
 
 import cn.hutool.core.io.resource.ResourceUtil;
 import cn.hutool.core.util.ArrayUtil;
+import cn.hutool.core.util.StrUtil;
 import com.github.dockerjava.api.DockerClient;
 import com.github.dockerjava.api.async.ResultCallback;
 import com.github.dockerjava.api.command.*;
@@ -11,6 +12,8 @@ import com.github.dockerjava.core.command.ExecStartResultCallback;
 import com.jh.ojcodesandbox.model.ExecuteCodeRequest;
 import com.jh.ojcodesandbox.model.ExecuteCodeResponse;
 import com.jh.ojcodesandbox.model.ExecuteMessage;
+import com.jh.ojcodesandbox.model.JudgeInfo;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StopWatch;
 
@@ -24,6 +27,7 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 @Component
+@Slf4j
 public class JavaDockerCodeSandbox extends JavaCodeSandboxTemplate
 {
 
@@ -31,16 +35,10 @@ public class JavaDockerCodeSandbox extends JavaCodeSandboxTemplate
 
     private static final Boolean FIRST_INIT = true;
 
-    public static void main(String[] args)
+    @Override
+    public ExecuteCodeResponse executeCode(ExecuteCodeRequest executeCodeRequest)
     {
-        JavaDockerCodeSandbox javaNativeCodeSandbox = new JavaDockerCodeSandbox();
-        ExecuteCodeRequest executeCodeRequest = new ExecuteCodeRequest();
-        executeCodeRequest.setInputList(Arrays.asList("1 2", "1 3"));
-        String code = ResourceUtil.readStr("testCode/simpleComputeArgs/Main.java", StandardCharsets.UTF_8);
-        executeCodeRequest.setCode(code);
-        executeCodeRequest.setLanguage("java");
-        ExecuteCodeResponse executeCodeResponse = javaNativeCodeSandbox.executeCode(executeCodeRequest);
-        System.out.println(executeCodeResponse);
+        return super.executeCode(executeCodeRequest);
     }
 
     /**
@@ -175,7 +173,20 @@ public class JavaDockerCodeSandbox extends JavaCodeSandboxTemplate
                 @Override
                 public void close() throws IOException
                 {
+                    log.info("尝试关闭 获取内存占用 ");
+                    try
+                    {
+                        // 停止容器
+                        dockerClient.stopContainerCmd(containerId).exec();
+                        System.out.println("容器已停止：" + containerId);
 
+                        // 删除容器
+                        dockerClient.removeContainerCmd(containerId).exec();
+                        System.out.println("容器已删除：" + containerId);
+                    } catch (Exception e)
+                    {
+                        System.out.println("停止或删除容器时发生异常：" + e.getMessage());
+                    }
                 }
 
                 @Override
@@ -218,6 +229,57 @@ public class JavaDockerCodeSandbox extends JavaCodeSandboxTemplate
             executeMessageList.add(executeMessage);
         }
         return executeMessageList;
+    }
+
+    /**
+     * 5.获取输出结果
+     *
+     * @param executeMessageList
+     * @return {@link ExecuteCodeResponse }
+     */
+    @Override
+    public ExecuteCodeResponse getOutputResponse(List<ExecuteMessage> executeMessageList)
+    {
+        JudgeInfo judgeInfo = new JudgeInfo();
+
+        ExecuteCodeResponse executeCodeResponse = new ExecuteCodeResponse();
+        List<String> outputList = new ArrayList<>();
+        //取用时最大值,便于判断是否超时
+        long maxTime = 0;
+        for (ExecuteMessage executeMessage : executeMessageList)
+        {
+            String errorMessage = executeMessage.getErrorMessage();
+            if (StrUtil.isNotBlank(errorMessage))
+            {
+                executeCodeResponse.setMessage(errorMessage);
+                // 用户提交的代码执行中存在错误
+                executeCodeResponse.setStatus(3);
+                break;
+            }
+            outputList.add(executeMessage.getMessage());
+            Long time = executeMessage.getTime();
+            if (time != null)
+            {
+                maxTime = Math.max(maxTime, time);
+            }
+            //获取最大内存
+            judgeInfo.setMemory(executeMessage.getMemory());
+            //获取最大时间
+            judgeInfo.setTime(executeMessage.getTime());
+            //获取最大输出
+            judgeInfo.setMessage(executeMessage.getMessage());
+
+
+        }    // 正常运行完成
+        if (outputList.size() == executeMessageList.size())
+        {
+            executeCodeResponse.setStatus(1);
+        }
+        executeCodeResponse.setOutputList(outputList);
+
+
+        executeCodeResponse.setJudgeInfo(judgeInfo);
+        return executeCodeResponse;
     }
 }
 

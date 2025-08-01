@@ -28,6 +28,7 @@ public class MainController
     private JavaDockerCodeSandbox javaDockerCodeSandbox;
 
 
+
     /**
      * 执行代码
      *
@@ -49,7 +50,7 @@ public class MainController
         {
             throw new RuntimeException("请求参数为空");
         }
-        return javaNativeCodeSandbox.executeCode(executeCodeRequest);
+        return javaDockerCodeSandbox.executeCode(executeCodeRequest);
     }
 
 }
